@@ -1,0 +1,34 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+generated_plugin_registrant.dart
+
+# Android
+**/gradle-wrapper.jar
+**/.gradle/
+**/local.properties
+**/captures/
+**/.cxx/
+**/GeneratedPluginRegistrant.java
+
+# iOS
+Pods/
+Podfile.lock
+Flutter/Flutter.podspec
+
+# IDEs
+*.iml
+.idea/
+.vscode/
+*.log
+
+# Keys
+key.properties
+*.keystore
+*.jks
+
+# Optional
+pubspec.lock
