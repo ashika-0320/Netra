@@ -6,55 +6,63 @@ import '../frontend_theme/app_theme.dart';
 class CategoryButton extends StatelessWidget {
   final String label;
   final String hint;
+  final IconData icon; // New Icon parameter
   final VoidCallback onTap;
 
   const CategoryButton({
     super.key,
     required this.label,
     required this.hint,
+    required this.icon, // Required parameter
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: '$label. Double tap to select.',
-      hint: hint,
-      button: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppTheme.radiusL),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusL),
+        child: Semantics(
+          label: label,
+          hint: hint,
+          button: true, // Merged semantics
+          excludeSemantics: true,
           child: Container(
             decoration: BoxDecoration(
               color: AppTheme.surfaceWhite,
               borderRadius: BorderRadius.circular(AppTheme.radiusL),
               border: Border.all(
-                color: AppTheme.dividerColor,
-                width: 1.5,
+                color: AppTheme.borderColor,
+                width: 1,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              boxShadow: AppTheme.cardShadow,
             ),
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(14.0),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                    letterSpacing: 0.5,
-                    height: 1.2,
-                  ),
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 28, // Slightly smaller for balance
+                      color: AppTheme.primaryBrand, 
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: AppTheme.textPrimary,
+                        fontSize: 13, // Prevent wrapping
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
