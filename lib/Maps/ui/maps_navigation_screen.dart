@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:netra_integrated/Maps/logic/navigation_manager.dart';
 import '../../frontend_theme/app_theme.dart';
 
+
 class MapsNavigation extends StatefulWidget {
   final LatLng destination;
 
@@ -26,7 +27,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
   void initState() {
     super.initState();
     _titleFocusNode = FocusNode();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _titleFocusNode.requestFocus();
     });
@@ -36,23 +37,22 @@ class _MapsNavigationState extends State<MapsNavigation> {
 
   Future<void> _initHelper() async {
     await _manager.initLocation();
-    // Removed premature _mapController.move here
     await _manager.startNavigation(widget.destination);
-    
-    // Listen to changes to update map camera
+
+    // Listen to changes to update map camera AND trigger route updates
     _manager.addListener(_onManagerUpdate);
   }
-  
+
   void _onManagerUpdate() {
-      if (!mounted) return;
-      if (_manager.currentPosition != null && _isMapReady) {
-          // Keep map centered and rotated
-          _mapController.move(
-              _manager.currentPosition!, 
-              _mapController.camera.zoom
-          );
-          // _mapController.rotate(-_manager.currentHeading); // Disabled: User wants arrow rotation only
-      }
+    if (!mounted) return;
+
+    if (_manager.currentPosition != null && _isMapReady) {
+      // Keep map centered
+      _mapController.move(
+          _manager.currentPosition!,
+          _mapController.camera.zoom
+      );
+    }
   }
 
   @override
@@ -65,93 +65,93 @@ class _MapsNavigationState extends State<MapsNavigation> {
   }
 
   void _showDirectionsSheet() {
-      showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20))
-          ),
-          builder: (context) {
-              return DraggableScrollableSheet(
-                  expand: false,
-                  initialChildSize: 0.6,
-                  maxChildSize: 0.9,
-                  minChildSize: 0.4,
-                  builder: (context, scrollController) {
-                      return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                  Row(
-                                      children: [
-                                          const Text("Detailed Directions", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                                          const Spacer(),
-                                          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))
-                                      ],
-                                  ),
-                                  const Divider(),
-                                  Expanded(
-                                      child: ListView.separated(
-                                          controller: scrollController,
-                                          itemCount: _manager.steps.length + 1,
-                                          separatorBuilder: (_,__) => const Divider(height: 1),
-                                          itemBuilder: (context, index) {
-                                              if (index == 0) {
-                                                   return const ListTile(
-                                                       leading: Icon(Icons.my_location, color: AppTheme.primaryBlue),
-                                                       title: Text("Start", style: TextStyle(fontWeight: FontWeight.bold)),
-                                                       subtitle: Text("Navigating to destination"),
-                                                   );
-                                              }
-                                              
-                                              final step = _manager.steps[index - 1];
-                                              final isCurrent = (index - 1) == _manager.currentStepIndex;
-                                              
-                                              // Use centralized robust logic
-                                              final instruction = _manager.getInstruction(step);
-                                              
-                                              // Dynamic Icon
-                                              IconData icon = Icons.directions;
-                                              final type = step.maneuver.type;
-                                              final mod = step.maneuver.modifier;
-                                              
-                                              if (type == 'turn') {
-                                                  if (mod.contains('left')) icon = Icons.turn_left;
-                                                  else if (mod.contains('right')) icon = Icons.turn_right;
-                                                  else if (mod.contains('straight')) icon = Icons.straight;
-                                                  else if (mod.contains('uturn')) icon = Icons.u_turn_left;
-                                              } else if (type == 'arrive') {
-                                                  icon = Icons.location_on;
-                                              } else if (type == 'roundabout') {
-                                                  icon = Icons.sync; // approximation
-                                              } else if (type == 'merge') {
-                                                  icon = Icons.call_merge;
-                                              } else if (type == 'fork') {
-                                                  icon = Icons.alt_route;
-                                              } else if (type == 'depart') {
-                                                  icon = Icons.explore; 
-                                              }
-                                              
-                                              return ListTile(
-                                                  tileColor: isCurrent ? AppTheme.primaryBlue.withOpacity(0.08) : null,
-                                                  leading: CircleAvatar(
-                                                      backgroundColor: isCurrent ? AppTheme.primaryBlue : Colors.grey.shade200,
-                                                      child: Icon(icon, color: isCurrent ? Colors.white : Colors.grey[700], size: 20),
-                                                  ),
-                                                  title: Text(instruction, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
-                                                  trailing: Text("${step.distance}m", style: const TextStyle(color: Colors.grey)),
-                                              );
-                                          },
-                                      ),
-                                  ),
-                              ],
-                          ),
-                      );
-                  },
+    showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))
+        ),
+        builder: (context) {
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.6,
+            maxChildSize: 0.9,
+            minChildSize: 0.4,
+            builder: (context, scrollController) {
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text("Detailed Directions", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const Spacer(),
+                        IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close))
+                      ],
+                    ),
+                    const Divider(),
+                    Expanded(
+                      child: ListView.separated(
+                        controller: scrollController,
+                        itemCount: _manager.steps.length + 1,
+                        separatorBuilder: (_,__) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return const ListTile(
+                              leading: Icon(Icons.my_location, color: AppTheme.primaryBlue),
+                              title: Text("Start", style: TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text("Navigating to destination"),
+                            );
+                          }
+
+                          final step = _manager.steps[index - 1];
+                          final isCurrent = (index - 1) == _manager.currentStepIndex;
+
+                          // Use centralized robust logic
+                          final instruction = _manager.getInstruction(step);
+
+                          // Dynamic Icon
+                          IconData icon = Icons.directions;
+                          final type = step.maneuver.type;
+                          final mod = step.maneuver.modifier;
+
+                          if (type == 'turn') {
+                            if (mod.contains('left')) icon = Icons.turn_left;
+                            else if (mod.contains('right')) icon = Icons.turn_right;
+                            else if (mod.contains('straight')) icon = Icons.straight;
+                            else if (mod.contains('uturn')) icon = Icons.u_turn_left;
+                          } else if (type == 'arrive') {
+                            icon = Icons.location_on;
+                          } else if (type == 'roundabout') {
+                            icon = Icons.sync; // approximation
+                          } else if (type == 'merge') {
+                            icon = Icons.call_merge;
+                          } else if (type == 'fork') {
+                            icon = Icons.alt_route;
+                          } else if (type == 'depart') {
+                            icon = Icons.explore;
+                          }
+
+                          return ListTile(
+                            tileColor: isCurrent ? AppTheme.primaryBlue.withOpacity(0.08) : null,
+                            leading: CircleAvatar(
+                              backgroundColor: isCurrent ? AppTheme.primaryBlue : Colors.grey.shade200,
+                              child: Icon(icon, color: isCurrent ? Colors.white : Colors.grey[700], size: 20),
+                            ),
+                            title: Text(instruction, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
+                            trailing: Text("${step.distance}m", style: const TextStyle(color: Colors.grey)),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               );
-          }
-      );
+            },
+          );
+        }
+    );
   }
 
   @override
@@ -169,7 +169,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
                 children: const [
                   CircularProgressIndicator(strokeWidth: 3),
                   SizedBox(height: 16),
-                  Text("Acquiring GPS Signal...", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  Text("Acquiring GPS Signal", style: TextStyle(color: Colors.grey, fontSize: 16)),
                 ],
               ),
             ),
@@ -177,7 +177,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
         }
 
         return Scaffold(
-          extendBodyBehindAppBar: true, 
+          extendBodyBehindAppBar: true,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -189,46 +189,46 @@ class _MapsNavigationState extends State<MapsNavigation> {
               child: Focus(
                 focusNode: _titleFocusNode,
                 child: Semantics(
-                   focused: true, // Hint to accessibility
-                   child: const Opacity(
-                     opacity: 0.0,
-                     child: Text('Turn-by-turn Navigation'),
-                   ),
+                  focused: true, // Hint to accessibility
+                  child: const Opacity(
+                    opacity: 0.0,
+                    child: Text('Turn-by-turn Navigation'),
+                  ),
                 ),
               ),
             ),
             centerTitle: true,
             leading: Padding(
-               padding: const EdgeInsets.all(8.0),
-               child: Semantics(
-                 sortKey: const OrdinalSortKey(1.0),
-                 label: 'Go back to locations list',
-                 button: true,
-                 child: CircleAvatar(
-                   backgroundColor: Colors.white.withOpacity(0.9),
-                   child: const BackButton(color: Colors.black),
-                 ),
-               ),
+              padding: const EdgeInsets.all(8.0),
+              child: Semantics(
+                sortKey: const OrdinalSortKey(1.0),
+                label: 'Go back to locations list',
+                button: true,
+                child: CircleAvatar(
+                  backgroundColor: Colors.white.withOpacity(0.9),
+                  child: const BackButton(color: Colors.black),
+                ),
+              ),
             ),
             actions: [
-               Padding(
-                 padding: const EdgeInsets.all(8.0),
-                 child: Semantics(
-                   sortKey: const OrdinalSortKey(2.0),
-                   label: '${_manager.voiceEnabled ? 'Mute' : 'Unmute'} voice guidance. ${_manager.voiceEnabled ? 'Voice guidance on' : 'Voice guidance off'}',
-                   child: CircleAvatar(
-                     backgroundColor: Colors.white.withOpacity(0.9),
-                     child: IconButton(
-                        onPressed: _manager.toggleVoice,
-                        icon: Icon(
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Semantics(
+                  sortKey: const OrdinalSortKey(2.0),
+                  label: '${_manager.voiceEnabled ? 'Mute' : 'Unmute'} voice guidance. ${_manager.voiceEnabled ? 'Voice guidance on' : 'Voice guidance off'}',
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white.withOpacity(0.9),
+                    child: IconButton(
+                      onPressed: _manager.toggleVoice,
+                      icon: Icon(
                           _manager.voiceEnabled ? Icons.volume_up : Icons.volume_off,
                           color: Colors.black87
-                        ),
-                        tooltip: _manager.voiceEnabled ? 'Mute guidance' : 'Unmute guidance',
-                     ),
-                   ),
-                 ),
-               )
+                      ),
+                      tooltip: _manager.voiceEnabled ? 'Mute guidance' : 'Unmute guidance',
+                    ),
+                  ),
+                ),
+              )
             ],
           ),
           body: Stack(
@@ -239,17 +239,17 @@ class _MapsNavigationState extends State<MapsNavigation> {
                 options: MapOptions(
                   initialCenter: _manager.currentPosition!,
                   initialZoom: 18,
-                  keepAlive: true, 
+                  keepAlive: true,
                   onMapReady: () {
                     if (mounted) {
-                        setState(() { _isMapReady = true; });
-                        if (_manager.currentPosition != null) {
-                           _mapController.move(_manager.currentPosition!, 18);
-                        }
+                      setState(() { _isMapReady = true; });
+                      if (_manager.currentPosition != null) {
+                        _mapController.move(_manager.currentPosition!, 18);
+                      }
                     }
                   },
                   interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate, 
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                   ),
                 ),
                 children: [
@@ -258,8 +258,8 @@ class _MapsNavigationState extends State<MapsNavigation> {
                     userAgentPackageName: 'com.netra.app',
                     maxZoom: 20,
                   ),
-                  
-                  // Route Line
+
+                  // Route Line - Now updates in real-time
                   if (_manager.remainingPolyline.isNotEmpty)
                     PolylineLayer(
                       polylines: [
@@ -275,7 +275,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
                         ),
                       ],
                     ),
-                  
+
                   // Markers
                   MarkerLayer(
                     markers: [
@@ -290,25 +290,25 @@ class _MapsNavigationState extends State<MapsNavigation> {
                         height: 70,
                         point: _manager.currentPosition!,
                         child: Transform.rotate(
-                           angle: (_manager.currentHeading * (3.14159 / 180)), 
-                           child: Container(
-                             decoration: BoxDecoration(
-                               color: Colors.white,
-                               shape: BoxShape.circle,
-                               boxShadow: [
-                                 BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8)
-                               ],
-                             ),
-                             padding: const EdgeInsets.all(4),
-                             child: const Icon(Icons.navigation, color: Color(0xFF1565C0), size: 40),
-                           ),
+                          angle: (_manager.currentHeading * (3.14159 / 180)),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8)
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(Icons.navigation, color: Color(0xFF1565C0), size: 40),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ],
               ),
-              
+
               // 2. Top Navigation Instruction Card
               Positioned(
                 top: MediaQuery.of(context).padding.top + 60, // Safe top + AppBar
@@ -318,7 +318,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
                   liveRegion: true,
                   label: _manager.bannerText,
                   child: GestureDetector(
-                    onTap: _showDirectionsSheet, 
+                    onTap: _showDirectionsSheet,
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -338,10 +338,10 @@ class _MapsNavigationState extends State<MapsNavigation> {
                                 Text(
                                   _manager.bannerText,
                                   style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.2
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.2
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -362,16 +362,16 @@ class _MapsNavigationState extends State<MapsNavigation> {
                             ),
                           ),
                           if (_manager.isRouting)
-                              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                           else
-                              Container(
+                            Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12)
+                                    color: Colors.white.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12)
                                 ),
                                 child: const Icon(Icons.turn_right, color: Colors.white, size: 32)
-                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -381,41 +381,41 @@ class _MapsNavigationState extends State<MapsNavigation> {
 
               // 3. Floating Re-center Button
               Positioned(
-                 bottom: MediaQuery.of(context).padding.bottom + 20, // Safe bottom padding
-                 right: 20,
-                 child: Semantics(
-                   label: 'Re-center map on my location',
-                   button: true,
-                   child: FloatingActionButton(
-                       heroTag: "recenter_btn",
-                       backgroundColor: AppTheme.surfaceWhite,
-                       foregroundColor: AppTheme.textPrimary,
-                       onPressed: () {
-                           if(_manager.currentPosition != null && _isMapReady) {
-                               _mapController.move(_manager.currentPosition!, 18);
-                               _mapController.rotate(-_manager.currentHeading);
-                           }
-                       },
-                       child: const Icon(Icons.my_location),
-                   ),
-                 ),
+                bottom: MediaQuery.of(context).padding.bottom + 20, // Safe bottom padding
+                right: 20,
+                child: Semantics(
+                  label: 'Re-center map on my location',
+                  button: true,
+                  child: FloatingActionButton(
+                    heroTag: "recenter_btn",
+                    backgroundColor: AppTheme.surfaceWhite,
+                    foregroundColor: AppTheme.textPrimary,
+                    onPressed: () {
+                        if(_manager.currentPosition != null && _isMapReady) {
+                          _mapController.move(_manager.currentPosition!, 18);
+                          _mapController.rotate(-_manager.currentHeading);
+                        }
+                    },
+                    child: const Icon(Icons.my_location),
+                  ),
+                ),
               ),
-              
-              // 4. List Button 
+
+              // 4. List Button
               Positioned(
-                 bottom: MediaQuery.of(context).padding.bottom + 90, // Stacked above recenter
-                 right: 20,
-                 child: Semantics(
-                   label: 'Show detailed directions list',
-                   button: true,
-                   child: FloatingActionButton.small(
-                       heroTag: "list_btn",
-                       backgroundColor: Colors.white,
-                       foregroundColor: Colors.black87,
-                       onPressed: _showDirectionsSheet,
-                       child: const Icon(Icons.format_list_bulleted),
-                   ),
-                 ),
+                bottom: MediaQuery.of(context).padding.bottom + 90, // Stacked above recenter
+                right: 20,
+                child: Semantics(
+                  label: 'Show detailed directions list',
+                  button: true,
+                  child: FloatingActionButton.small(
+                    heroTag: "list_btn",
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black87,
+                    onPressed: _showDirectionsSheet,
+                    child: const Icon(Icons.format_list_bulleted),
+                  ),
+                ),
               ),
             ],
           ),

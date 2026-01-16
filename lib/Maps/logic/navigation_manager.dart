@@ -12,6 +12,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_compass/flutter_compass.dart'; // Compass
+import 'package:vibration/vibration.dart';
 
 class NavigationManager extends ChangeNotifier {
   // State
@@ -278,6 +279,8 @@ class NavigationManager extends ChangeNotifier {
     
     _updateGuidanceNumbers();
     _periodicReassurance();
+
+    notifyListeners();
   }
   
   void _advanceStep() {
@@ -316,34 +319,49 @@ class NavigationManager extends ChangeNotifier {
   // Haptics (Minimal)
   // ----------------------------
   void _checkHaptics() {
-      if (_currentPosition == null || _route.steps.isEmpty || _currentStepIndex >= _route.steps.length) return;
-      
-      // Only vibrate if moving (> 0.5 m/s approx check/ or just skip if accuracy bad)
-      if (_currentAccuracy > 30) return;
+    if (_currentPosition == null || _route.steps.isEmpty || _currentStepIndex >= _route.steps.length) return;
 
-      final step = _route.steps[_currentStepIndex];
-      final targetLat = step.maneuver.latLng.latitude;
-      final targetLng = step.maneuver.latLng.longitude;
-      
-      // Bearing from Here -> Target
-      final bearingToTarget = _calculateBearing(_currentPosition!, step.maneuver.latLng);
-      
-      // Error
-      double error = (bearingToTarget - _currentHeading).abs();
-      if (error > 180) error = 360 - error;
-      
-      // Aligned if error < 15 degrees
-      bool aligned = error <= 15;
-      
-      if (aligned && !_isAligned) {
-           // Entered alignment area
-           final now = DateTime.now();
-           if (now.difference(_lastHapticAt) > const Duration(seconds: 3)) {
-               HapticFeedback.lightImpact(); // Short clean buzz
-               _lastHapticAt = now;
-           }
+    // Only vibrate if moving (good accuracy)
+    if (_currentAccuracy > 30) return;
+
+    final step = _route.steps[_currentStepIndex];
+
+    // Bearing from current position to the next maneuver point
+    final bearingToTarget = _calculateBearing(_currentPosition!, step.maneuver.latLng);
+
+    // Calculate the angular difference between where user is facing and where they should go
+    double error = (bearingToTarget - _currentHeading).abs();
+    if (error > 180) error = 360 - error;
+
+    // Aligned if within 90 degrees (facing generally the right direction)
+    // Misaligned if error > 90 degrees (facing opposite or perpendicular)
+    bool aligned = error <= 90;
+
+    final now = DateTime.now();
+
+    if (!aligned && _isAligned) {
+      // Just became MISALIGNED (was aligned, now not)
+      // Give a single 0.5 second vibration
+      if (now.difference(_lastHapticAt) > const Duration(milliseconds: 600)) {
+        Vibration.vibrate(duration: 500);
+        _lastHapticAt = now;
+        debugPrint("Haptic: Misaligned (>90°) - Single vibration");
       }
-      _isAligned = aligned;
+    }
+    else if (aligned && !_isAligned) {
+      // Just became ALIGNED (was misaligned, now aligned)
+      // Give two continuous 0.5 second vibrations
+      if (now.difference(_lastHapticAt) > const Duration(milliseconds: 600)) {
+        Vibration.vibrate(duration: 500);
+        Future.delayed(const Duration(milliseconds: 550), () {
+          Vibration.vibrate(duration: 500);
+        });
+        _lastHapticAt = now;
+        debugPrint("Haptic: Aligned - Double vibration");
+      }
+    }
+
+    _isAligned = aligned;
   }
 
   double _calculateBearing(LatLng start, LatLng end) {
