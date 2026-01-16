@@ -5,6 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:netra_integrated/Maps/logic/navigation_manager.dart';
 import '../../frontend_theme/app_theme.dart';
+import 'package:vibration/vibration.dart';
+
 
 class MapsNavigation extends StatefulWidget {
   final LatLng destination;
@@ -169,7 +171,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
                 children: const [
                   CircularProgressIndicator(strokeWidth: 3),
                   SizedBox(height: 16),
-                  Text("Acquiring GPS Signal...", style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  Text("Acquiring GPS Signal", style: TextStyle(color: Colors.grey, fontSize: 16)),
                 ],
               ),
             ),
@@ -391,10 +393,12 @@ class _MapsNavigationState extends State<MapsNavigation> {
                        backgroundColor: AppTheme.surfaceWhite,
                        foregroundColor: AppTheme.textPrimary,
                        onPressed: () {
-                           if(_manager.currentPosition != null && _isMapReady) {
-                               _mapController.move(_manager.currentPosition!, 18);
-                               _mapController.rotate(-_manager.currentHeading);
-                           }
+                           // if(_manager.currentPosition != null && _isMapReady) {
+                           //     _mapController.move(_manager.currentPosition!, 18);
+                           //     _mapController.rotate(-_manager.currentHeading);
+                           // }
+                         Vibration.vibrate(duration: 1000);
+                         print('vibrations must occur');
                        },
                        child: const Icon(Icons.my_location),
                    ),
