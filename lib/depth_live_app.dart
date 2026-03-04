@@ -7,6 +7,7 @@ import 'tts/speaker.dart';
 import 'tts/speech_policy.dart';
 import 'depth_services/detect_service.dart';
 
+
 class DepthLiveApp extends StatelessWidget {
   final CameraDescription camera;
   const DepthLiveApp({super.key, required this.camera});
@@ -74,9 +75,9 @@ class _DepthLivePageState extends State<DepthLivePage> {
       final bytes = await file.readAsBytes();
 
       // 1) JSON -> phrase -> speak
-      final jsonResp = await DetectService.detectWithDepthJson(bytes);
-      final phrase = phraseFromDetections(jsonResp.detections);
-      if (phrase != null) {
+      final yoloResp = await DetectService.detectYoloJson(bytes);
+      final phrase = yoloResp.narrative; // already clean speech-friendly
+      if (phrase.isNotEmpty) {
         await _speaker.say(phrase);
       }
 

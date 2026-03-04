@@ -5,6 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../depth_services/detect_service.dart';
 import '../../frontend_theme/app_theme.dart';
+import '../../tts/speaker.dart';
+import '../../tts/speech_policy.dart';
 import '../logic/navigation_manager.dart';
 
 
@@ -547,8 +549,10 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
   Uint8List? _annotatedPng;
   String? _error;
 
+  final Speaker _speaker = Speaker();
+
   // ✅ takePicture() is slow; do not spam.
-  static const Duration _interval = Duration(milliseconds: 350);
+  static const Duration _interval = Duration(milliseconds: 300);
 
   @override
   void initState() {
@@ -560,10 +564,12 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
       enableAudio: false,
     );
 
-    _initFuture = _controller!.initialize().then((_) {
+    _initFuture = _controller!.initialize().then((_) async {
+      await _speaker.init();
       _timer = Timer.periodic(_interval, (_) => _captureAndSend());
     }).catchError((e) {
-      if (mounted) setState(() => _error = 'Camera init error: $e');
+      if (!mounted) return;
+      setState(() => _error = 'Camera init error: $e');
     });
   }
 
@@ -578,7 +584,22 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
       final XFile file = await c.takePicture();
       final bytes = await file.readAsBytes();
 
-      // ✅ Calls your FastAPI endpoint and returns PNG bytes
+      // 1) JSON -> phrase -> speak
+      //    (your DetectService must return something like { detections: [...] })
+      final jsonResp = await DetectService.detectWithDepthJson(bytes);
+
+// ✅ Prefer server narrative
+      final phrase = jsonResp.narrative.trim();
+
+// ✅ Fallback to local policy if server returns empty
+      final fallback = phraseFromDetections(jsonResp.detections);
+
+      final toSpeak = phrase.isNotEmpty ? phrase : (fallback ?? '');
+      if (toSpeak.isNotEmpty) {
+        await _speaker.say(toSpeak);
+      }
+
+      // 2) PNG -> UI
       final png = await DetectService.detectWithDepth(bytes);
 
       if (!mounted) return;
@@ -597,6 +618,7 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
   @override
   void dispose() {
     _timer?.cancel();
+    _speaker.dispose();
     _controller?.dispose();
     super.dispose();
   }
@@ -622,6 +644,7 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
             Expanded(
               child: Row(
                 children: [
+                  // Left: smooth local preview
                   Expanded(
                     flex: 1,
                     child: ClipRRect(
@@ -630,6 +653,7 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
                     ),
                   ),
                   const SizedBox(width: 6),
+                  // Right: API “video feed” (annotated frames)
                   Expanded(
                     flex: 1,
                     child: Container(
