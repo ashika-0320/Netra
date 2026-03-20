@@ -3,8 +3,10 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-
+import 'tts/speaker.dart';
+import 'tts/speech_policy.dart';
 import 'depth_services/detect_service.dart';
+
 
 class DepthLiveApp extends StatelessWidget {
   final CameraDescription camera;
@@ -37,9 +39,10 @@ class _DepthLivePageState extends State<DepthLivePage> {
 
   Uint8List? _annotatedPng;
   String? _error;
+  final Speaker _speaker = Speaker();
 
   // takePicture() is slow: 800–1500ms is realistic
-  static const Duration _interval = Duration(milliseconds: 1200);
+  static const Duration _interval = Duration(milliseconds: 10);
 
   @override
   void initState() {
@@ -51,9 +54,11 @@ class _DepthLivePageState extends State<DepthLivePage> {
       enableAudio: false,
     );
 
-    _initFuture = _controller!.initialize().then((_) {
+    _initFuture = _controller!.initialize().then((_) async {
+      await _speaker.init();
       _timer = Timer.periodic(_interval, (_) => _captureAndSend());
     }).catchError((e) {
+      if (!mounted) return;
       setState(() => _error = 'Camera init error: $e');
     });
   }
@@ -69,6 +74,14 @@ class _DepthLivePageState extends State<DepthLivePage> {
       final XFile file = await c.takePicture();
       final bytes = await file.readAsBytes();
 
+      // 1) JSON -> phrase -> speak
+      final yoloResp = await DetectService.detectYoloJson(bytes);
+      final phrase = yoloResp.narrative; // already clean speech-friendly
+      if (phrase.isNotEmpty) {
+        await _speaker.say(phrase);
+      }
+
+      // 2) PNG -> UI
       final png = await DetectService.detectWithDepth(bytes);
 
       if (!mounted) return;
@@ -87,6 +100,7 @@ class _DepthLivePageState extends State<DepthLivePage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _speaker.dispose();
     _controller?.dispose();
     super.dispose();
   }

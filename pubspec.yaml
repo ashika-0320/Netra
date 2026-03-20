@@ -1,4 +1,4 @@
-name: netra_integrated
+name: netra_working_all
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -40,6 +40,15 @@ dependencies:
   speech_to_text: ^7.3.0
   camera: ^0.11.0
   image: ^4.3.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  url_launcher: ^6.3.0
+  flutter_tts: ^4.2.0
+  flutter_compass: ^0.8.1
+  vibration: ^3.1.5
+  flutter_localizations:
+    sdk: flutter
+
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,6 @@
 {
-    "name": "netra_integrated",
-    "short_name": "netra_integrated",
+    "name": "netra_working_all",
+    "short_name": "netra_working_all",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:latlong2/latlong.dart';
+import '../Maps/ui/maps_navigation_screen.dart';
 import '../frontend_models/location_model.dart';
 import '../frontend_services/osm_service.dart';
 import '../frontend_theme/app_theme.dart';
@@ -24,6 +26,7 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
   bool _isListening = false;
   bool _isSearching = false;
   bool _speechAvailable = false;
+  bool _preferDetection = false;
 
   @override
   void initState() {
@@ -71,13 +74,25 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
         });
 
         if (result.finalResult) {
-          setState(() => _isListening = false);
+          final spoken = result.recognizedWords.toLowerCase();
+          _preferDetection = spoken.contains("with detection") ||
+              spoken.contains("with object detection") ||
+              spoken.contains("obstacle detection");
 
-          SemanticsService.announce(
-            'Search query: ${result.recognizedWords}',
-            TextDirection.ltr,
-          );
+          _searchLocations();
         }
+
+        // if (result.finalResult) {
+        //   setState(() => _isListening = false);
+        //
+        //   SemanticsService.announce(
+        //     'Search query: ${result.recognizedWords}',
+        //     TextDirection.ltr,
+        //   );
+        //
+        //   // Auto-search on voice complete
+        //   _searchLocations();
+        // }
       },
       listenFor: const Duration(seconds: 30),
       pauseFor: const Duration(seconds: 3),
@@ -116,8 +131,6 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
         _isSearching = false;
       });
 
-      // ✅ THIS is where the "2nd code" goes:
-      // show a visible message if no results are found
       if (results.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No locations found for "$query"')),
@@ -129,7 +142,7 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
         );
       } else {
         SemanticsService.announce(
-          'Found ${results.length} locations',
+          'Found ${results.length} locations. Select one to start navigation.',
           TextDirection.ltr,
         );
       }
@@ -144,48 +157,63 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
     }
   }
 
-  void _showLocationDetails(LocationModel location) {
-    showDialog(
+  void _startNavigation(LocationModel location) {
+    final dest = LatLng(location.latitude, location.longitude);
+
+    showModalBottomSheet(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(location.name),
-          content: SingleChildScrollView(
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (location.address != null) ...[
-                  const Text(
-                    'Address:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(location.address!),
-                  const SizedBox(height: 16),
-                ],
                 const Text(
-                  'Coordinates:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  "Start Navigation",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 4),
-                Text('Latitude: ${location.latitude.toStringAsFixed(6)}'),
-                Text('Longitude: ${location.longitude.toStringAsFixed(6)}'),
+                const SizedBox(height: 12),
+
+                ListTile(
+                  leading: const Icon(Icons.map),
+                  title: const Text("Navigation only"),
+                  subtitle: const Text("Map + route + voice guidance"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => MapsNavigation(
+                          destination: dest,
+                          withDetection: false,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.visibility),
+                  title: const Text("Navigation + Object Detection"),
+                  subtitle: const Text("Map + route + live obstacle detection"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => MapsNavigation(
+                          destination: dest,
+                          withDetection: true,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
         );
       },
     );
@@ -212,12 +240,17 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
           ),
         ),
       ),
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppTheme.backgroundLight,
       body: Column(
         children: [
           // Search Input Section
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          Container(
+            padding: const EdgeInsets.all(24.0),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceWhite,
+              boxShadow: AppTheme.softShadow,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+            ),
             child: Column(
               children: [
                 Semantics(
@@ -225,18 +258,34 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
                   textField: true,
                   child: TextField(
                     controller: _searchController,
+                    style: TextStyle(color: AppTheme.textPrimary),
                     decoration: InputDecoration(
                       labelText: 'Enter location',
                       hintText: 'Say or type location name',
-                      prefixIcon: const Icon(Icons.search),
+                      labelStyle: TextStyle(color: AppTheme.textSecondary),
+                      prefixIcon: Icon(Icons.search, color: AppTheme.primaryBlue),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                         borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                         borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                         borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                         borderSide: BorderSide(color: AppTheme.primaryBlue, width: 2),
+                      ),
                       suffixIcon: _isListening
                           ? IconButton(
-                        icon: const Icon(Icons.mic, color: Colors.red),
+                        icon: Icon(Icons.mic, color: AppTheme.primaryGreen),
                         onPressed: _stopListening,
                         tooltip: 'Stop listening',
                       )
                           : IconButton(
-                        icon: const Icon(Icons.mic),
+                        icon: Icon(Icons.mic, color: AppTheme.textSecondary),
                         onPressed: _startListening,
                         tooltip: 'Start voice input',
                       ),
@@ -244,7 +293,7 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
                     onSubmitted: (_) => _searchLocations(),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
@@ -265,9 +314,10 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
                               : const Icon(Icons.search),
                           label: Text(_isSearching ? 'Searching...' : 'Search'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryGreen,
+                            backgroundColor: AppTheme.primaryBlue, // Primary Action
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
+                            elevation: 2,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(AppTheme.radiusM),
                             ),
@@ -286,9 +336,11 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
                         icon: Icon(_isListening ? Icons.stop : Icons.mic),
                         label: Text(_isListening ? 'Stop' : 'Voice'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _isListening ? Colors.red[600] : AppTheme.primaryBlue,
-                          foregroundColor: Colors.white,
+                          backgroundColor: _isListening ? AppTheme.primaryGreen : Colors.white,
+                          foregroundColor: _isListening ? Colors.white : AppTheme.primaryBlue,
+                          side: _isListening ? null : BorderSide(color: AppTheme.primaryBlue, width: 1.5),
                           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                          elevation: _isListening ? 2 : 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(AppTheme.radiusM),
                           ),
@@ -301,13 +353,14 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: 12.0),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.mic, color: Colors.red, size: 20),
+                        Icon(Icons.mic, color: AppTheme.primaryGreen, size: 20),
                         const SizedBox(width: 8),
                         Text(
                           'Listening... Speak now',
                           style: TextStyle(
-                            color: Colors.red[700],
+                            color: AppTheme.primaryGreen,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -357,7 +410,20 @@ class _SearchLocationPageState extends State<SearchLocationPage> {
               itemBuilder: (context, index) {
                 return LocationCard(
                   location: _searchResults[index],
-                  onTap: () => _showLocationDetails(_searchResults[index]),
+                  onTap: () {
+                    if (_preferDetection) {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MapsNavigation(
+                            destination: LatLng(_searchResults[index].latitude, _searchResults[index].longitude),
+                            withDetection: true,
+                          ),
+                        ),
+                      );
+                    } else {
+                      _startNavigation(_searchResults[index]); // shows sheet
+                    }
+                  },
                 );
               },
             ),

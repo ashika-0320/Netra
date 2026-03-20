@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+
 import '../frontend_models/location_model.dart';
 import '../frontend_services/location_service.dart';
-
+import '../Maps/ui/maps_navigation_screen.dart';
 import '../frontend_theme/app_theme.dart';
 import '../frontend_widgets/location_card.dart';
-
 
 class LocationsListPage extends StatefulWidget {
   final String category;
@@ -32,6 +34,68 @@ class _LocationsListPageState extends State<LocationsListPage> {
     _fetchLocations();
   }
 
+  void _showNavigationModeSheet(LatLng dest) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Start Navigation",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+
+                ListTile(
+                  leading: const Icon(Icons.map),
+                  title: const Text("Navigation only"),
+                  subtitle: const Text("Map + route + voice guidance"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MapsNavigation(
+                          destination: dest,
+                          withDetection: false,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.visibility),
+                  title: const Text("Navigation + Object Detection"),
+                  subtitle: const Text("Map + route + live obstacle detection"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MapsNavigation(
+                          destination: dest,
+                          withDetection: true,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _fetchLocations() async {
     setState(() {
       _isLoading = true;
@@ -50,7 +114,7 @@ class _LocationsListPageState extends State<LocationsListPage> {
         latitude: position!.latitude,
         longitude: position.longitude,
         category: widget.category,
-        limit: 6,
+        limit: 10, // Increased limit slightly
         radius: 2000, // 2km radius
       );
 
@@ -66,76 +130,20 @@ class _LocationsListPageState extends State<LocationsListPage> {
     }
   }
 
-  void _showLocationDetails(LocationModel location) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(location.name),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (location.address != null) ...[
-                  const Text(
-                    'Address:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(location.address!),
-                  const SizedBox(height: 16),
-                ],
-                const Text(
-                  'Coordinates:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text('Latitude: ${location.latitude.toStringAsFixed(6)}'),
-                Text('Longitude: ${location.longitude.toStringAsFixed(6)}'),
-                if (location.distance != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Distance: ${location.distance!.toStringAsFixed(0)} meters',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   String _getCategoryTitle() {
     switch (widget.category.toUpperCase()) {
       case 'TRANSPORT':
         return 'Nearby Transport';
       case 'HEALTH':
-        return 'Nearby Health Services';
+        return 'Health Services';
       case 'BANK AND ATM':
-        return 'Nearby Banks & ATMs';
+        return 'Banks & ATMs';
       case 'FOOD':
-        return 'Nearby Restaurants';
+        return 'Restaurants';
       case 'LODGING':
-        return 'Nearby Hotels';
+        return 'Hotels';
       case 'STORE':
-        return 'Nearby Stores';
+        return 'Stores';
       default:
         return 'Nearby Places';
     }
@@ -144,22 +152,30 @@ class _LocationsListPageState extends State<LocationsListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundLight,
       appBar: AppBar(
-        title: Text(_getCategoryTitle()),
+        title: Semantics(
+          sortKey: OrdinalSortKey(0.0),
+          header: true,
+          child: Text(_getCategoryTitle()),
+        ),
+        centerTitle: true,
         leading: Semantics(
-          label: 'Back button. Double tap to go back.',
+          sortKey: OrdinalSortKey(1.0),
+          label: 'Back button. Double tap to return to categories.',
           button: true,
+          excludeSemantics: true,
           child: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
+            icon: const Icon(Icons.arrow_back_ios_new), // Modern icon
+            onPressed: () => Navigator.of(context).pop(),
           ),
         ),
         actions: [
           Semantics(
-            label: 'Refresh locations. Double tap to reload.',
+            sortKey: OrdinalSortKey(2.0),
+            label: 'Refresh locations. Double tap to reload list.',
             button: true,
+            excludeSemantics: true,
             child: IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _fetchLocations,
@@ -167,117 +183,116 @@ class _LocationsListPageState extends State<LocationsListPage> {
           ),
         ],
       ),
-      backgroundColor: Colors.grey[50],
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : _errorMessage.isNotEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.red[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[800],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _errorMessage,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: _fetchLocations,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Retry'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryBlue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _buildBody(),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_errorMessage.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red[300],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Error Loading Locations',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _fetchLocations,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try Again'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
                   ),
-                )
-              : _locations.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.location_off,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No locations found',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'No ${widget.category.toLowerCase()} found nearby.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: _fetchLocations,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Retry'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue[600],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: _locations.length,
-                      itemBuilder: (context, index) {
-                        return LocationCard(
-                          location: _locations[index],
-                          onTap: () => _showLocationDetails(_locations[index]),
-                        );
-                      },
-                    ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_locations.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.location_off, size: 80, color: AppTheme.dividerColor),
+            const SizedBox(height: 16),
+            Text(
+              'No Places Found',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: AppTheme.textSecondary),
+            ),
+             const SizedBox(height: 8),
+             Text(
+              'No ${widget.category.toLowerCase()} found nearby.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8, bottom: 20),
+      itemCount: _locations.length,
+      itemBuilder: (context, index) {
+        final loc = _locations[index];
+        
+        // Manual staggered animation
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: Duration(milliseconds: 400 + (index * 100).clamp(0, 600)), // Staggered delay caps at 1s
+          curve: Curves.easeOut,
+          builder: (context, value, child) {
+            return Transform.translate(
+              offset: Offset(0, 50 * (1 - value)),
+              child: Opacity(
+                opacity: value,
+                child: child,
+              ),
+            );
+          },
+          child: LocationCard(
+            location: loc,
+            onTap: () {
+              final dest = LatLng(loc.latitude, loc.longitude);
+              _showNavigationModeSheet(dest);
+            },
+          ),
+        );
+      },
     );
   }
 }
-
