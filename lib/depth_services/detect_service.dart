@@ -31,7 +31,7 @@ class YoloJsonResponse {
 }
 
 class DetectService {
-  static const String baseUrl = 'http://192.168.1.71:8000';
+  static const String baseUrl = 'http://192.168.1.72:8000';
 
   // PNG bytes (keep for UI)
   static Future<Uint8List> detectWithDepth(Uint8List imageBytes) async {

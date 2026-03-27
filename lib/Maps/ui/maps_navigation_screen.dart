@@ -1,15 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../depth_services/detect_service.dart';
-import '../../frontend_theme/app_theme.dart';
-import '../../tts/speaker.dart';
-import '../../tts/speech_policy.dart';
-import '../logic/navigation_manager.dart';
-
-
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -19,7 +7,10 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../depth_services/detect_service.dart';
 import '../../frontend_theme/app_theme.dart';
+import '../../tts/speech_coordinator.dart';
+import '../../tts/speech_policy.dart';
 import '../logic/navigation_manager.dart';
 
 
@@ -40,6 +31,7 @@ class MapsNavigation extends StatefulWidget {
 class _MapsNavigationState extends State<MapsNavigation> {
   final NavigationManager _manager = NavigationManager();
   final MapController _mapController = MapController();
+  final SpeechCoordinator _speechCoordinator = SpeechCoordinator();
   bool _isMapReady = false;
 
   late FocusNode _titleFocusNode;
@@ -57,6 +49,9 @@ class _MapsNavigationState extends State<MapsNavigation> {
   }
 
   Future<void> _initHelper() async {
+    await _speechCoordinator.init();
+    _manager.setSpeechCoordinator(_speechCoordinator);
+
     await _manager.initLocation();
     await _manager.startNavigation(widget.destination);
 
@@ -77,6 +72,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
     _titleFocusNode.dispose();
     _manager.removeListener(_onManagerUpdate);
     _manager.dispose();
+    _speechCoordinator.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -264,7 +260,6 @@ class _MapsNavigationState extends State<MapsNavigation> {
           left: 16,
           right: 16,
           child: Semantics(
-            liveRegion: true,
             label: _manager.bannerText,
             child: GestureDetector(
               onTap: _showDirectionsSheet,
@@ -464,7 +459,7 @@ class _MapsNavigationState extends State<MapsNavigation> {
                 flex: 1,
                 child: Container(
                   color: Colors.black,
-                  child: _DetectionSection(),
+                  child: _DetectionSection(coordinator: _speechCoordinator),
                 ),
               ),
               Expanded(
@@ -485,6 +480,9 @@ class _MapsNavigationState extends State<MapsNavigation> {
 /// Separated to keep MapsNavigation clean.
 ///
 class _DetectionSection extends StatefulWidget {
+  final SpeechCoordinator coordinator;
+  const _DetectionSection({required this.coordinator});
+
   @override
   State<_DetectionSection> createState() => _DetectionSectionState();
 }
@@ -521,7 +519,7 @@ class _DetectionSectionState extends State<_DetectionSection> {
         }
 
         final cam = _pickBestCamera(snapshot.data!);
-        return DepthLivePanel(camera: cam);
+        return DepthLivePanel(camera: cam, coordinator: widget.coordinator);
       },
     );
   }
@@ -533,7 +531,8 @@ class _DetectionSectionState extends State<_DetectionSection> {
 ///
 class DepthLivePanel extends StatefulWidget {
   final CameraDescription camera;
-  const DepthLivePanel({super.key, required this.camera});
+  final SpeechCoordinator coordinator;
+  const DepthLivePanel({super.key, required this.camera, required this.coordinator});
 
   @override
   State<DepthLivePanel> createState() => _DepthLivePanelState();
@@ -549,8 +548,6 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
   Uint8List? _annotatedPng;
   String? _error;
 
-  final Speaker _speaker = Speaker();
-
   // ✅ takePicture() is slow; do not spam.
   static const Duration _interval = Duration(milliseconds: 300);
 
@@ -565,7 +562,6 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
     );
 
     _initFuture = _controller!.initialize().then((_) async {
-      await _speaker.init();
       _timer = Timer.periodic(_interval, (_) => _captureAndSend());
     }).catchError((e) {
       if (!mounted) return;
@@ -596,7 +592,7 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
 
       final toSpeak = phrase.isNotEmpty ? phrase : (fallback ?? '');
       if (toSpeak.isNotEmpty) {
-        await _speaker.say(toSpeak);
+        await widget.coordinator.speakObject(toSpeak);
       }
 
       // 2) PNG -> UI
@@ -618,7 +614,6 @@ class _DepthLivePanelState extends State<DepthLivePanel> {
   @override
   void dispose() {
     _timer?.cancel();
-    _speaker.dispose();
     _controller?.dispose();
     super.dispose();
   }

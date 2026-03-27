@@ -3,16 +3,15 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart'; // Unified Voice
 import 'package:flutter/services.dart'; // Haptics
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_compass/flutter_compass.dart'; // Compass
 import 'package:vibration/vibration.dart';
 
+import '../../tts/speech_coordinator.dart';
 import '../models/route_models.dart';
 
 class NavigationManager extends ChangeNotifier {
@@ -33,11 +32,10 @@ class NavigationManager extends ChangeNotifier {
   // Tools
   StreamSubscription<Position>? _posSub;
   StreamSubscription<CompassEvent>? _compassSub;
-  final FlutterTts _tts = FlutterTts();
+  SpeechCoordinator? _speechCoordinator;
 
   // Config
   bool _voiceEnabled = true;
-  bool _isSpeaking = false;
   DateTime _lastRerouteAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastPeriodicSpeakAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0); // Haptic Cooldown
@@ -55,38 +53,24 @@ class NavigationManager extends ChangeNotifier {
   bool get isRouting => _isRouting;
   String get bannerText => _bannerText;
   bool get voiceEnabled => _voiceEnabled;
-  bool get isSpeaking => _isSpeaking;
   double? get remainingMeters => _remainingMeters;
   double? get metersToNextManeuver => _metersToNextManeuver;
 
-  NavigationManager() {
-    _initTts();
+  NavigationManager();
+
+  /// Attach a shared SpeechCoordinator for all voice output.
+  void setSpeechCoordinator(SpeechCoordinator coordinator) {
+    _speechCoordinator = coordinator;
   }
 
   @override
   void dispose() {
     _posSub?.cancel();
     _compassSub?.cancel();
-    _tts.stop();
     super.dispose();
   }
 
-  Future<void> _initTts() async {
-    await _tts.setLanguage("en-US");
-    await _tts.setSpeechRate(0.5);
-    await _tts.setPitch(1.0);
-    await _tts.awaitSpeakCompletion(true);
-    
-    _tts.setStartHandler(() {
-      _isSpeaking = true;
-      notifyListeners();
-    });
-    
-    _tts.setCompletionHandler(() {
-      _isSpeaking = false;
-      notifyListeners();
-    });
-  }
+
 
   Future<void> initLocation() async {
     if (await Permission.location.request().isGranted) {
@@ -190,9 +174,8 @@ class NavigationManager extends ChangeNotifier {
 
   Future<void> toggleVoice() async {
     _voiceEnabled = !_voiceEnabled;
-    if (!_voiceEnabled) {
-      await _tts.stop();
-    } else {
+    _speechCoordinator?.setVoiceEnabled(_voiceEnabled);
+    if (_voiceEnabled) {
       _warnedAction = false; // Allow re-announce
       _checkProgress(); // Trigger immediate check
     }
@@ -379,14 +362,21 @@ class NavigationManager extends ChangeNotifier {
   double _rad2deg(double r) => r * (180.0 / pi);
 
   void _periodicReassurance() {
-    // Only if very far from next maneuver (>100m)
-    if (_metersToNextManeuver != null && _metersToNextManeuver! > 100) {
-        final now = DateTime.now();
-        // Every ~100m or 60s
-        if (now.difference(_lastPeriodicSpeakAt) > const Duration(seconds: 60)) {
-             _lastPeriodicSpeakAt = now;
-             _speak("Continue straight.");
-        }
+    if (_route.steps.isEmpty || _currentStepIndex >= _route.steps.length) return;
+
+    final now = DateTime.now();
+    // Speak every 6 seconds
+    if (now.difference(_lastPeriodicSpeakAt) > const Duration(seconds: 6)) {
+      _lastPeriodicSpeakAt = now;
+      
+      final currentStep = _route.steps[_currentStepIndex];
+      final instruction = getInstruction(currentStep);
+      
+      if (_metersToNextManeuver != null) {
+        _speak("In ${_formatDistance(_metersToNextManeuver!)}, $instruction");
+      } else {
+        _speak(instruction);
+      }
     }
   }
 
@@ -454,7 +444,7 @@ class NavigationManager extends ChangeNotifier {
 
   Future<void> _speak(String text) async {
     if (_voiceEnabled) {
-        SemanticsService.announce(text, TextDirection.ltr);
+      await _speechCoordinator?.speakNavigation(text);
     }
   }
 
