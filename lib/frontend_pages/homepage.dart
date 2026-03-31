@@ -1,6 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import '../depth_live_app.dart';
+import '../depth_services/detect_service.dart';
 import '../frontend_theme/app_theme.dart';
 import 'navigation_page.dart';
 
@@ -40,10 +41,59 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
+  void _showSettingsDialog() {
+    final TextEditingController urlController =
+        TextEditingController(text: DetectService.baseUrl);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('API Settings'),
+        content: TextField(
+          controller: urlController,
+          decoration: const InputDecoration(
+            labelText: 'Server Base URL',
+            hintText: 'http://192.168.1.xx:8000',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                DetectService.baseUrl = urlController.text.trim();
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Base URL updated to: ${DetectService.baseUrl}')),
+              );
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundLight,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: AppTheme.primaryBlue),
+            onPressed: _showSettingsDialog,
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
+      extendBodyBehindAppBar: true,
       body: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
@@ -52,7 +102,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               // Navigation Mode Button
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, kToolbarHeight + 16, 16, 8),
                   child: Transform.translate(
                     offset: Offset(0, _slideAnimation.value),
                     child: Opacity(
